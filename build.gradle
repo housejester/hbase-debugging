@@ -1,0 +1,98 @@
+plugins {
+    id "java"
+    id "application"
+    id "idea"
+    id "eu.appsatori.fatjar" version "0.3"
+}
+
+mainClassName = 'io.d8a.hbase.FullGcTest'
+compileJava {
+    sourceCompatibility = 1.7
+    targetCompatibility = 1.7
+    options.encoding = "UTF-8"
+    options.compilerArgs = [
+            '-Xlint:cast,deprecation,divzero,empty,unchecked,fallthrough,path,serial,finally,overrides,-options',
+            '-XprintProcessorInfo'
+    ]
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    provided
+    testProvided { extendsFrom provided }
+}
+
+sourceSets {
+    main { compileClasspath += configurations.provided }
+    test {
+        compileClasspath += configurations.testProvided
+        resources {
+            srcDirs += "src/main/resources"
+        }
+    }
+}
+
+
+dependencies {
+    compile(group: 'org.apache.hbase', name: 'hbase-client', version: '0.98.13-hadoop2') {
+    }
+
+    compile(group: 'org.apache.hbase', name: 'hbase-common', version: '0.98.13-hadoop2') {
+    }
+}
+
+run {
+    jvmArgs '-Xmx1900m', '-verbose:gc'
+}
+
+test {
+    // set heap size for the test JVM(s)
+    minHeapSize = "32m"
+    maxHeapSize = "64m"
+
+    // set JVM arguments for the test JVM(s)
+    jvmArgs '-XX:MaxPermSize=56m'
+    afterTest { desc, result ->
+        println "Executing test ${desc.name} [${desc.className}] with result: ${result.resultType}"
+    }
+}
+
+fatJar {
+    dependsOn configurations.runtime
+
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+}
+
+idea {
+    module {
+        // enrich the IDE with Groovy support
+        iml.withXml { provider ->
+            provider.node.component.first().appendNode('orderEntry',
+                    [type: 'library', name: '2.4.3', level: 'application'])
+        }
+    }
+    project {
+        jdkName = '1.7'
+        languageLevel = '1.7'
+
+        ipr {
+            // let the IDE know that this is a Git project
+            withXml { provider ->
+                provider.node.component.find { it.@name == 'VcsDirectoryMappings' }.mapping.@vcs = 'Git'
+                provider.node.component.find { it.@name == 'CompilerConfiguration' }.annotationProcessing[0].replaceNode {
+                    annotationProcessing {
+                        profile(default: true, name: 'Default', enabled: true) {
+                            processorPath useClasspath: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
